@@ -1,0 +1,26 @@
+[package]
+name = "p2pvr"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+avian3d = { path = "./3rd-party-crates/avian/crates/avian3d", features = ["serialize"]}
+avian_interpolation3d = { path = "./3rd-party-crates/avian_interpolation/crates/avian_interpolation3d"}
+avian_pickup = { path = "./3rd-party-crates/avian_pickup" }
+bevy = "0.14.2"
+bevy_matchbox = { version = "0.10.0", features = ["signaling"] }
+unavi-player = { path = "./3rd-party-crates/unavi-player" }
+bevy_basic_portals = "0.6.0"
+bevy_vrm = "0.0.11"
+bevy-tnua-physics-integration-layer = { path = "./3rd-party-crates/bevy-tnua2/physics-integration-layer" }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+unavi-avatar = { path = "./3rd-party-crates/unavi-avatar"}
+
+[dependencies.uuid]
+version = "1.10.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
