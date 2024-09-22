@@ -1,3 +1,9 @@
+mod networking;
+
+use crate::networking::message::SpawnCube;
+use crate::networking::{
+    Authority, Message, NetworkingPlugin, PlayerUuid, PropUuid, SocketSendMessage,
+};
 use avian3d::prelude::*;
 use avian3d::prelude::{Collider, RigidBody};
 use avian3d::PhysicsPlugins;
@@ -6,28 +12,16 @@ use avian_interpolation3d::{
 };
 use avian_pickup::prelude::{AvianPickupAction, AvianPickupActor, AvianPickupInput};
 use avian_pickup::AvianPickupPlugin;
-use bevy::app::RunFixedMainLoop;
 use bevy::asset::AssetMetaCheck;
-use bevy::ecs::query::QuerySingleError;
 use bevy::input::keyboard::KeyboardInput;
-use bevy::input::mouse::MouseMotion;
-use bevy::render::camera::camera_system;
-use bevy::render::view::RenderLayers;
+use bevy::prelude::*;
 use bevy::time::run_fixed_main_schedule;
-use bevy::window::WindowResolution;
-use bevy::{prelude::*, time::common_conditions::on_timer, utils::Duration};
-use bevy_basic_portals::{AsPortalDestination, CreatePortal, CreatePortalBundle, PortalsPlugin};
+use bevy::utils::tracing::log::__private_api::loc;
 use bevy_matchbox::prelude::*;
 use bevy_tnua_physics_integration_layer::data_for_backends::TnuaProximitySensor;
-use bevy_vrm::first_person::{FirstPersonFlag, RENDER_LAYERS};
-use bevy_vrm::VrmBundle;
 use serde::{Deserialize, Serialize};
-use std::f32::consts::FRAC_PI_2;
-use unavi_avatar::{
-    default_character_animations, AvatarBundle, AverageVelocity, FallbackAvatar, DEFAULT_VRM,
-};
-use unavi_avatar::{PLAYER_HEIGHT, PLAYER_WIDTH};
-use unavi_player::layers::{LAYER_LOCAL_PLAYER, LAYER_OTHER_PLAYER, LAYER_PROPS};
+use unavi_avatar::PLAYER_HEIGHT;
+use unavi_player::layers::LAYER_PROPS;
 use unavi_player::{LocalPlayer, PlayerCamera, PlayerPlugin};
 use uuid::{uuid, Uuid};
 
@@ -43,20 +37,19 @@ fn main() {
             AvianPickupPlugin::default(),
             // Add interpolation
             AvianInterpolationPlugin::default(),
-            PortalsPlugin::default(),
         ))
+        .add_plugins(NetworkingPlugin)
         .add_systems(Startup, setup_scene)
         .add_systems(Update, player_add_pickup)
         .add_systems(Update, add_uuid)
+        .add_systems(Update, handle_spawn_cube)
         .add_systems(
             FixedPreUpdate,
             (handle_input).before(run_fixed_main_schedule),
         )
         .add_systems(Startup, start_socket)
-        .add_systems(Update, receive_messages)
-        .add_systems(Update, send_message)
         .add_systems(Startup, |mut windows: Query<&mut Window>| {
-            windows.single_mut().resolution.set(1920.0, 1080.0);
+            //windows.single_mut().resolution.set(1920.0, 1080.0);
         })
         .run();
 }
@@ -64,7 +57,12 @@ fn main() {
 fn handle_input(
     mut avian_pickup_input_writer: EventWriter<AvianPickupInput>,
     key_input: Res<ButtonInput<MouseButton>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     actors: Query<Entity, With<AvianPickupActor>>,
+    mut spawn_cube: EventWriter<SpawnCube>,
+    mut commands: Commands,
+    local_player: Query<&PlayerUuid, With<LocalPlayer>>,
+    mut socket: ResMut<MatchboxSocket<SingleChannel>>,
 ) {
     for actor in &actors {
         if key_input.just_pressed(MouseButton::Left) {
@@ -86,27 +84,22 @@ fn handle_input(
             });
         }
     }
-}
 
-fn rotate_camera(
-    mut mouse_motion: EventReader<MouseMotion>,
-    mut cameras: Query<&mut Transform, With<Camera>>,
-    mut players: Query<(&mut Transform, &Children), (With<LocalPlayer>, Without<Camera>)>,
-) {
-    for (mut player_tr, children) in players.iter_mut() {}
-    for mut transform in &mut cameras {
-        let mouse_sensitivity = Vec2::new(0.003, 0.002);
+    let Ok(local_player) = local_player.get_single() else {
+        return;
+    };
 
-        for motion in mouse_motion.read() {
-            let delta_yaw = -motion.delta.x * mouse_sensitivity.x;
-            let delta_pitch = -motion.delta.y * mouse_sensitivity.y;
-
-            const PITCH_LIMIT: f32 = FRAC_PI_2 - 0.01;
-            let (yaw, pitch, roll) = transform.rotation.to_euler(EulerRot::YXZ);
-            let yaw = yaw + delta_yaw;
-            let pitch = (pitch + delta_pitch).clamp(-PITCH_LIMIT, PITCH_LIMIT);
-            transform.rotation = Quat::from_euler(EulerRot::YXZ, yaw, pitch, roll);
-        }
+    if keyboard_input.just_pressed(KeyCode::KeyC) {
+        let cube = SpawnCube {
+            authority: Authority {
+                player: local_player.clone(),
+                counter: 0,
+            },
+            prop_uuid: PropUuid(Uuid::new_v4().to_string()),
+            position: Position::new(Vec3::new(0.0, 2.0, 0.0)),
+        };
+        socket.send_msg_all(&Message::SpawnCube(cube.clone()));
+        spawn_cube.send(cube.clone());
     }
 }
 
@@ -179,6 +172,35 @@ fn other_thing(
     }
 }
 
+fn handle_spawn_cube(
+    mut commands: Commands,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut event_reader: EventReader<SpawnCube>,
+) {
+    for cube in event_reader.read() {
+        let cube_material = materials.add(Color::linear_rgb(0.0, 1.0, 0.0));
+
+        let box_shape = Cuboid::from_size(Vec3::splat(0.5));
+        let box_mesh = meshes.add(box_shape);
+        commands.spawn((
+            Name::new("Light Box"),
+            PbrBundle {
+                mesh: box_mesh.clone(),
+                material: cube_material.clone(),
+                transform: Transform::from_xyz(cube.position.x, cube.position.y, cube.position.z),
+                ..default()
+            },
+            cube.authority.clone(),
+            cube.prop_uuid.clone(),
+            // All `RigidBody::Dynamic` entities are able to be picked up.
+            RigidBody::Dynamic,
+            Collider::from(box_shape),
+            CollisionLayers::new(LAYER_PROPS, LayerMask::ALL),
+        ));
+    }
+}
+
 fn setup_scene(
     mut ambient: ResMut<AmbientLight>,
     mut commands: Commands,
@@ -192,7 +214,7 @@ fn setup_scene(
         transform: Transform::from_xyz(4.5, 10.0, -7.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
-    let cube_material = materials.add(Color::linear_rgb(0.0, 1.0, 0.0));
+    let cube_material = materials.add(Color::linear_rgb(1.0, 0.0, 0.0));
 
     let box_shape = Cuboid::from_size(Vec3::splat(0.5));
     let box_mesh = meshes.add(box_shape);
@@ -229,130 +251,9 @@ fn setup_scene(
 }
 
 fn start_socket(mut commands: Commands) {
-    let socket = MatchboxSocket::new_reliable("wss://mb.v-sekai.cloud/hello1");
+    let socket = MatchboxSocket::new_reliable("wss://mb.v-sekai.cloud/hello2");
+    //let socket = MatchboxSocket::new_reliable("ws://localhost:3536/hello");
     commands.insert_resource(socket);
 }
 
-#[derive(Component)]
-pub struct PlayerUuid(pub String);
-
-fn send_message(
-    mut socket: ResMut<MatchboxSocket<SingleChannel>>,
-    local_player: Query<(&Position, &Rotation, &LinearVelocity, &PlayerUuid), With<LocalPlayer>>,
-) {
-    let (position, rotation, linear_velocity, uuid) = match local_player.get_single() {
-        Ok(val) => val,
-        Err(err) => {
-            println!("returning: {}", err);
-            return;
-        }
-    };
-
-    let peers: Vec<_> = socket.connected_peers().collect();
-
-    for peer in peers {
-        let msg = Message::Position(
-            uuid.0.clone(),
-            position.clone(),
-            rotation.clone(),
-            linear_velocity.clone(),
-        );
-        let msg = serde_json::to_string(&msg).unwrap();
-
-        //info!("Sending message: {msg:?} to {peer}");
-        socket.send(msg.as_bytes().into(), peer);
-    }
-}
-
-fn receive_messages(
-    mut commands: Commands,
-    mut socket: ResMut<MatchboxSocket<SingleChannel>>,
-    mut query: Query<(
-        &mut Position,
-        &mut Rotation,
-        &mut LinearVelocity,
-        &PlayerUuid,
-    )>,
-    asset_server: Res<AssetServer>,
-) {
-    for (peer, state) in socket.update_peers() {
-        //info!("{peer}: {state:?}");
-    }
-
-    for (_id, message) in socket.receive() {
-        match std::str::from_utf8(&message) {
-            Ok(message) => {
-                let message = serde_json::from_str::<Message>(message).unwrap();
-                match message {
-                    Message::Position(uuid, position, rotation, linear_velocity) => {
-                        let mut contains = false;
-                        for (mut p, mut r, mut l, u) in query.iter_mut() {
-                            if u.0 != uuid {
-                                continue;
-                            }
-                            contains = true;
-                            *p = position;
-                            *r = rotation;
-                            *l = linear_velocity;
-                        }
-                        if !contains {
-                            spawn_other_player(&asset_server, &mut commands, PlayerUuid(uuid));
-                            return;
-                        }
-                    }
-                }
-            }
-            Err(e) => error!("Failed to convert message to string: {e}"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-enum Message {
-    Position(String, Position, Rotation, LinearVelocity),
-}
 pub const SPAWN: Vec3 = Vec3::new(0.0, PLAYER_HEIGHT * 2.0, 0.0);
-
-pub fn spawn_other_player(asset_server: &AssetServer, commands: &mut Commands, uuid: PlayerUuid) {
-    let animations = default_character_animations(&asset_server);
-
-    let body = commands
-        .spawn((
-            Collider::capsule(PLAYER_WIDTH / 2.0, PLAYER_HEIGHT - PLAYER_WIDTH),
-            CollisionLayers {
-                memberships: LAYER_OTHER_PLAYER,
-                ..default()
-            },
-            RigidBody::Dynamic,
-            LockedAxes::ROTATION_LOCKED,
-            SpatialBundle {
-                global_transform: GlobalTransform::from_translation(SPAWN),
-                ..default()
-            },
-            uuid,
-        ))
-        .id();
-
-    let avatar = commands
-        .spawn((
-            AvatarBundle {
-                animations,
-                fallback: FallbackAvatar,
-                velocity: AverageVelocity {
-                    target: Some(body),
-                    ..default()
-                },
-            },
-            VrmBundle {
-                scene_bundle: SceneBundle {
-                    transform: Transform::from_xyz(0.0, -PLAYER_HEIGHT / 2.0, 0.0),
-                    ..default()
-                },
-                vrm: asset_server.load(DEFAULT_VRM),
-                ..default()
-            },
-        ))
-        .id();
-
-    commands.entity(body).push_children(&[avatar]);
-}

@@ -1443,16 +1443,6 @@ dependencies = [
 
 [[package]]
 name = "bevy_shader_mtoon"
-version = "0.0.11"
-source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
-dependencies = [
- "bevy",
- "bevy_mod_outline",
- "bitflags 2.6.0",
-]
-
-[[package]]
-name = "bevy_shader_mtoon"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f88ea218a2c31a20e59b06fe0c6414b4693361d6b698deb916d5abf454b981f7"
@@ -1639,36 +1629,19 @@ dependencies = [
 
 [[package]]
 name = "bevy_vrm"
-version = "0.0.11"
-source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
-dependencies = [
- "bevy",
- "bevy_gltf_kun",
- "bevy_shader_mtoon 0.0.11",
- "gltf_kun",
- "gltf_kun_vrm 0.0.11",
- "paste",
- "petgraph",
- "serde",
- "serde_vrm 0.0.11",
- "thiserror",
-]
-
-[[package]]
-name = "bevy_vrm"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3dd6f760b00b7252013dccd7e87a25bde37bb616f0e52f09c49fb9857d1255b9"
 dependencies = [
  "bevy",
  "bevy_gltf_kun",
- "bevy_shader_mtoon 0.0.12",
+ "bevy_shader_mtoon",
  "gltf_kun",
- "gltf_kun_vrm 0.0.12",
+ "gltf_kun_vrm",
  "paste",
  "petgraph",
  "serde",
- "serde_vrm 0.0.12",
+ "serde_vrm",
  "thiserror",
 ]
 
@@ -3087,19 +3060,6 @@ dependencies = [
 
 [[package]]
 name = "gltf_kun_vrm"
-version = "0.0.11"
-source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
-dependencies = [
- "gltf_kun",
- "serde",
- "serde_json",
- "serde_vrm 0.0.11",
- "thiserror",
- "tracing",
-]
-
-[[package]]
-name = "gltf_kun_vrm"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6b0188e36ad91ca82729d27b99eabcbf0ef68d2c36a8532628f5236449f6f24"
@@ -3107,7 +3067,7 @@ dependencies = [
  "gltf_kun",
  "serde",
  "serde_json",
- "serde_vrm 0.0.12",
+ "serde_vrm",
  "thiserror",
  "tracing",
 ]
@@ -4579,7 +4539,7 @@ dependencies = [
  "bevy-tnua-physics-integration-layer",
  "bevy_basic_portals",
  "bevy_matchbox",
- "bevy_vrm 0.0.12",
+ "bevy_vrm",
  "serde",
  "serde_json",
  "unavi-avatar",
@@ -5538,16 +5498,6 @@ dependencies = [
 
 [[package]]
 name = "serde_vrm"
-version = "0.0.11"
-source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
-dependencies = [
- "bevy",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "serde_vrm"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c1f26a75514cfb16d00fa4ba00b718d3266572a477610739aa1ef1a8c960193"
@@ -6271,7 +6221,7 @@ version = "0.0.1"
 dependencies = [
  "avian3d",
  "bevy",
- "bevy_vrm 0.0.11",
+ "bevy_vrm",
  "paste",
 ]
 
@@ -6283,7 +6233,7 @@ dependencies = [
  "bevy",
  "bevy-tnua",
  "bevy-tnua-avian3d",
- "bevy_vrm 0.0.11",
+ "bevy_vrm",
  "unavi-avatar",
  "web-sys",
 ]
