@@ -46,8 +46,7 @@ impl Plugin for PlayerPlugin {
                 body::set_avatar_head,
                 body::setup_first_person,
                 input::read_keyboard_input,
-                look::capture_cursor,
-                look::release_cursor,
+                look::grab_mouse,
                 (
                     (look::read_mouse_input, look::apply_camera_look).chain(),
                     //look::read_mouse_input,

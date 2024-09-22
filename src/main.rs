@@ -14,17 +14,15 @@ use avian_pickup::actor::AvianPickupActorState;
 use avian_pickup::prelude::{AvianPickupAction, AvianPickupActor, AvianPickupInput};
 use avian_pickup::AvianPickupPlugin;
 use bevy::asset::AssetMetaCheck;
-use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::time::run_fixed_main_schedule;
-use bevy::utils::tracing::log::__private_api::loc;
 use bevy_matchbox::prelude::*;
 use bevy_tnua_physics_integration_layer::data_for_backends::TnuaProximitySensor;
 use serde::{Deserialize, Serialize};
 use unavi_avatar::PLAYER_HEIGHT;
 use unavi_player::layers::LAYER_PROPS;
 use unavi_player::{LocalPlayer, PlayerCamera, PlayerPlugin};
-use uuid::{uuid, Uuid};
+use uuid::{Uuid};
 
 fn main() {
     App::new()
@@ -81,7 +79,7 @@ fn update_prop_authority(
                             action: AvianPickupAction::Drop,
                             actor: actor_e,
                         });
-                        /*commands.entity(actor_e).insert(AvianPickupActorState::Idle);*/
+                        commands.entity(actor_e).insert(AvianPickupActorState::Idle);
                         commands.entity(prop).remove::<LocalProp>();
                         return;
                     }

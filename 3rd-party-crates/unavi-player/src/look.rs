@@ -128,7 +128,7 @@ pub fn apply_camera_look(
     }
 }
 
-/*pub fn grab_mouse(
+pub fn grab_mouse(
     mut windows: Query<&mut Window>,
     mouse: Res<ButtonInput<MouseButton>>,
     key: Res<ButtonInput<KeyCode>>,
@@ -143,29 +143,5 @@ pub fn apply_camera_look(
             window.cursor.visible = true;
             window.cursor.grab_mode = CursorGrabMode::None;
         }
-    }
-}
-*/
-
-pub fn capture_cursor(
-    mut q_window: Query<&mut Window>,
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
-) {
-    let Ok(mut window) = q_window.get_single_mut() else { return };
-    if mouse_button_input.just_pressed(MouseButton::Left) {
-        window.cursor.visible = false;
-        window.cursor.grab_mode = CursorGrabMode::Locked;
-        // Clear Bevy's grab mode cache by setting a different grab mode
-        // because an unlocked cursor will not update the current `CursorGrabMode`.
-        // See <https://github.com/bevyengine/bevy/issues/8949>
-        window.cursor.grab_mode = CursorGrabMode::Confined;
-    }
-}
-
-pub fn release_cursor(mut q_window: Query<&mut Window>, keyboard_input: Res<ButtonInput<KeyCode>>,) {
-    let Ok(mut window) = q_window.get_single_mut() else { return };
-    if keyboard_input.just_pressed(KeyCode::Escape) {
-        window.cursor.visible = true;
-        window.cursor.grab_mode = CursorGrabMode::None;
     }
 }

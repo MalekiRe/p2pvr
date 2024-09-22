@@ -5,7 +5,7 @@ use crate::networking::systems::{
 };
 use crate::SPAWN;
 use avian3d::collision::{Collider, CollisionLayers};
-use avian3d::prelude::{LockedAxes, RigidBody};
+use avian3d::prelude::{GravityScale, LockedAxes, RigidBody};
 use bevy::app::App;
 use bevy::asset::AssetServer;
 use bevy::prelude::{
@@ -111,7 +111,7 @@ impl Plugin for NetworkingPlugin {
 
 pub mod message {
     use crate::networking::{Authority, PlayerUuid, PropUuid};
-    use avian3d::prelude::{LinearVelocity, Position, Rotation};
+    use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
     use bevy::prelude::Event;
     use bevy_matchbox::prelude::PeerId;
     use serde::{Deserialize, Serialize};
@@ -130,6 +130,7 @@ pub mod message {
         pub position: Position,
         pub rotation: Rotation,
         pub linear_velocity: LinearVelocity,
+        pub angular_velocity: AngularVelocity,
     }
     #[derive(Clone, Serialize, Deserialize, Debug, Event)]
     pub struct DeleteProp {
@@ -152,7 +153,7 @@ pub mod systems {
     use crate::networking::{
         Authority, ExternalPlayer, Message, PlayerUuid, PropUuid, SocketSendMessage,
     };
-    use avian3d::prelude::{LinearVelocity, Position, Rotation};
+    use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
     use bevy::prelude::*;
     use bevy_matchbox::matchbox_socket::SingleChannel;
     use bevy_matchbox::MatchboxSocket;
@@ -199,7 +200,7 @@ pub mod systems {
     pub fn sync_local_props_to_network(
         mut socket: ResMut<MatchboxSocket<SingleChannel>>,
         local_props: Query<
-            (&Position, &Rotation, &LinearVelocity, &PropUuid, &Authority),
+            (&Position, &Rotation, &LinearVelocity, &AngularVelocity, &PropUuid, &Authority),
             (
                 With<Authority>,
                 Or<(
@@ -224,7 +225,7 @@ pub mod systems {
 
         socket.update_peers();
 
-        for (position, rotation, linear_velocity, uuid, authority) in local_props.iter() {
+        for (position, rotation, linear_velocity, angular_velocity, uuid, authority) in local_props.iter() {
             if authority.player != *player_uuid {
                 continue;
             }
@@ -234,6 +235,7 @@ pub mod systems {
                 position: position.clone(),
                 rotation: rotation.clone(),
                 linear_velocity: linear_velocity.clone(),
+                angular_velocity: angular_velocity.clone(),
             });
             socket.send_msg_all(&message);
         }
@@ -261,7 +263,7 @@ pub mod systems {
             spawn_external_player, Authority, ExternalPlayer, Message, PlayerUuid, PropUuid,
             SocketSendMessage,
         };
-        use avian3d::prelude::{LinearVelocity, Position, Rotation};
+        use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
         use bevy::prelude::*;
         use bevy_matchbox::prelude::SingleChannel;
         use bevy_matchbox::MatchboxSocket;
@@ -297,12 +299,13 @@ pub mod systems {
                 &mut Position,
                 &mut Rotation,
                 &mut LinearVelocity,
+                &mut AngularVelocity,
                 &PropUuid,
                 &mut Authority,
             )>,
         ) {
             for update_prop in event_reader.read() {
-                for (mut position, mut rotation, mut linear_velocity, prop_uuid, mut authority) in
+                for (mut position, mut rotation, mut linear_velocity, mut angular_velocity, prop_uuid, mut authority) in
                     external_props.iter_mut()
                 {
                     if update_prop.prop_uuid != *prop_uuid {
@@ -311,6 +314,10 @@ pub mod systems {
                     if authority.counter <= update_prop.authority.counter {
                         *authority = update_prop.authority.clone();
                     }
+                    if update_prop.authority.counter < authority.counter {
+                        continue;
+                    }
+                    *angular_velocity = update_prop.angular_velocity;
                     *position = update_prop.position;
                     *rotation = update_prop.rotation;
                     *linear_velocity = update_prop.linear_velocity;
@@ -385,6 +392,7 @@ pub fn spawn_external_player(
             },
             RigidBody::Dynamic,
             LockedAxes::ROTATION_LOCKED,
+            GravityScale(0.0),
             SpatialBundle {
                 global_transform: GlobalTransform::from_translation(SPAWN),
                 ..default()
