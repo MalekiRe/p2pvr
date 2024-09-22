@@ -67,14 +67,17 @@ const VOID_LEVEL: f32 = -50.0;
 
 pub fn void_teleport(
     mut players: Query<
-        (&mut Transform, &mut LinearVelocity, &mut AngularVelocity),
+        (&Transform, &mut Position, &mut LinearVelocity, &mut AngularVelocity),
         With<LocalPlayer>,
     >,
 ) {
-    for (mut transform, mut linvel, mut angvel) in players.iter_mut() {
+    for (transform, mut position, mut linvel, mut angvel) in players.iter_mut() {
         if transform.translation.y < VOID_LEVEL {
             info!("Player fell into void! Teleporting player to spawn...");
-            transform.translation = SPAWN;
+            //transform.translation = SPAWN;
+            position.x = SPAWN.x;
+            position.y = SPAWN.y;
+            position.z = SPAWN.z;
             angvel.x = 0.0;
             angvel.y = 0.0;
             angvel.z = 0.0;

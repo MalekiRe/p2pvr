@@ -1,5 +1,8 @@
 use crate::networking::message::{DeleteProp, PlayerPosition, SpawnCube, UpdateProp};
-use crate::networking::systems::{message_handling, remove_dead_players, sync_local_player_to_network, sync_local_props_to_network};
+use crate::networking::systems::{
+    message_handling, remove_dead_players, sync_local_player_to_network,
+    sync_local_props_to_network,
+};
 use crate::SPAWN;
 use avian3d::collision::{Collider, CollisionLayers};
 use avian3d::prelude::{LockedAxes, RigidBody};
@@ -95,7 +98,14 @@ impl Plugin for NetworkingPlugin {
                     .after(message_handling::route_messages),
             );
 
-        app.add_systems(Update, (sync_local_props_to_network, sync_local_player_to_network, remove_dead_players));
+        app.add_systems(
+            Update,
+            (
+                sync_local_props_to_network,
+                sync_local_player_to_network,
+                remove_dead_players,
+            ),
+        );
     }
 }
 
@@ -288,17 +298,19 @@ pub mod systems {
                 &mut Rotation,
                 &mut LinearVelocity,
                 &PropUuid,
-                &Authority,
+                &mut Authority,
             )>,
         ) {
             for update_prop in event_reader.read() {
-                for (mut position, mut rotation, mut linear_velocity, prop_uuid, authority) in
+                for (mut position, mut rotation, mut linear_velocity, prop_uuid, mut authority) in
                     external_props.iter_mut()
                 {
                     if update_prop.prop_uuid != *prop_uuid {
                         continue;
                     }
-                    println!("updating prop");
+                    if authority.counter <= update_prop.authority.counter {
+                        *authority = update_prop.authority.clone();
+                    }
                     *position = update_prop.position;
                     *rotation = update_prop.rotation;
                     *linear_velocity = update_prop.linear_velocity;

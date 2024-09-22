@@ -10,6 +10,7 @@ use avian3d::PhysicsPlugins;
 use avian_interpolation3d::{
     AvianInterpolationPlugin, InterpolateTransformFields, InterpolationMode,
 };
+use avian_pickup::actor::AvianPickupActorState;
 use avian_pickup::prelude::{AvianPickupAction, AvianPickupActor, AvianPickupInput};
 use avian_pickup::AvianPickupPlugin;
 use bevy::asset::AssetMetaCheck;
@@ -47,11 +48,54 @@ fn main() {
             FixedPreUpdate,
             (handle_input).before(run_fixed_main_schedule),
         )
+        .add_systems(Update, update_prop_authority)
         .add_systems(Startup, start_socket)
         .add_systems(Startup, |mut windows: Query<&mut Window>| {
             //windows.single_mut().resolution.set(1920.0, 1080.0);
         })
         .run();
+}
+
+#[derive(Component)]
+pub struct LocalProp;
+
+fn update_prop_authority(
+    actors: Query<(Entity, &AvianPickupActorState)>,
+    mut prop: Query<&mut Authority, Without<LocalProp>>,
+    changed_prop: Query<(Entity, &Authority), (Changed<Authority>, With<LocalProp>)>,
+    uuid: Query<&PlayerUuid, With<LocalPlayer>>,
+    mut commands: Commands,
+    mut avian_pickup_input_writer: EventWriter<AvianPickupInput>,
+) {
+    let Ok(uuid) = uuid.get_single() else {
+        return;
+    };
+    for (actor_e, actor) in actors.iter() {
+        match actor {
+            AvianPickupActorState::Idle => {}
+            AvianPickupActorState::Pulling(e) | AvianPickupActorState::Holding(e) => {
+                if let Ok((prop, authority)) = changed_prop.get(*e) {
+                    if authority.player != uuid.clone() {
+                        println!("no longer in charge of prop");
+                        avian_pickup_input_writer.send(AvianPickupInput {
+                            action: AvianPickupAction::Drop,
+                            actor: actor_e,
+                        });
+                        /*commands.entity(actor_e).insert(AvianPickupActorState::Idle);*/
+                        commands.entity(prop).remove::<LocalProp>();
+                        return;
+                    }
+                }
+                if let Ok(mut prop) = prop.get_mut(*e) {
+                    if prop.player != uuid.clone() {
+                        prop.counter += 1;
+                        prop.player = uuid.clone();
+                        commands.entity(*e).insert(LocalProp);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn handle_input(
@@ -60,7 +104,6 @@ fn handle_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     actors: Query<Entity, With<AvianPickupActor>>,
     mut spawn_cube: EventWriter<SpawnCube>,
-    mut commands: Commands,
     local_player: Query<&PlayerUuid, With<LocalPlayer>>,
     mut socket: ResMut<MatchboxSocket<SingleChannel>>,
 ) {
