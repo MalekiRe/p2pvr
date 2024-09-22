@@ -9,7 +9,7 @@ avian3d = { path = "../avian/crates/avian3d"}
 bevy-tnua = { path = "../bevy-tnua2" }
 bevy-tnua-avian3d = { path = "../bevy-tnua2/avian3d" }
 bevy = "0.14.2"
-bevy_vrm = "0.0.11"
+bevy_vrm = { git = "https://github.com/unavi-xyz/bevy_vrm" }
 unavi-avatar = { path = "../unavi-avatar" }
 
 [target.'cfg(target_family = "wasm")'.dependencies]

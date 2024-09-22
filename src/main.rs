@@ -20,6 +20,8 @@ use bevy_tnua_physics_integration_layer::data_for_backends::TnuaProximitySensor;
 use bevy_vrm::first_person::{FirstPersonFlag, RENDER_LAYERS};
 use serde::{Deserialize, Serialize};
 use std::f32::consts::FRAC_PI_2;
+use bevy::asset::AssetMetaCheck;
+use bevy::window::WindowResolution;
 use bevy_vrm::VrmBundle;
 use unavi_avatar::{AvatarBundle, AverageVelocity, default_character_animations, DEFAULT_VRM, FallbackAvatar};
 use unavi_player::layers::{LAYER_LOCAL_PLAYER, LAYER_OTHER_PLAYER, LAYER_PROPS};
@@ -29,8 +31,12 @@ use uuid::{uuid, Uuid};
 
 fn main() {
     App::new()
+
         .add_plugins((
-            DefaultPlugins,
+            DefaultPlugins.set(AssetPlugin {
+                meta_check: AssetMetaCheck::Never,
+                ..AssetPlugin::default()
+            }),
             PhysicsPlugins::default(),
             PlayerPlugin,
             AvianPickupPlugin::default(),
@@ -40,7 +46,7 @@ fn main() {
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, player_add_pickup)
-        .add_systems(Update, (remove_thing, add_uuid))
+        .add_systems(Update, add_uuid)
         .add_systems(FixedPreUpdate, (handle_input).before(run_fixed_main_schedule))
         .add_systems(Startup, start_socket)
         .add_systems(Update, receive_messages)
@@ -48,6 +54,9 @@ fn main() {
             Update,
             send_message,
         )
+        .add_systems(Startup, |mut windows: Query<&mut Window>,| {
+            windows.single_mut().resolution.set(1920.0, 1080.0);
+        })
         .run();
 }
 
@@ -120,19 +129,6 @@ fn player_add_pickup(
                 rotation: InterpolationMode::Linear,
             }
         ));
-    }
-}
-
-fn remove_thing(
-    player: Query<Entity, (With<LocalPlayer>, Without<InterpolateTransformFields>)>,
-    mut commands: Commands,
-) {
-    for awa in player.iter() {
-        /*commands.entity(awa)
-        .insert(InterpolateTransformFields {
-            translation: InterpolationMode::Last,
-            rotation: InterpolationMode::Last,
-        });*/
     }
 }
 
@@ -225,24 +221,12 @@ fn setup_scene(
         Collider::cuboid(GROUND_SIZE, GROUND_THICK, GROUND_SIZE),
     ));
 
-    commands.spawn(CreatePortalBundle {
-        mesh: meshes.add(Mesh::from(Rectangle::new(GROUND_SIZE, MIRROR_H))),
-        create_portal: CreatePortal {
-            destination: AsPortalDestination::CreateMirror,
-            render_layer: RenderLayers::layer(0)
-                .union(&RENDER_LAYERS[&FirstPersonFlag::ThirdPersonOnly]),
-            ..default()
-        },
-        portal_transform: Transform::from_xyz(0.0, -1.0 + MIRROR_H / 2.0, -GROUND_SIZE / 2.0),
-        ..default()
-    });
-
     let mut transform = Transform::from_xyz(0.0, 3.0, -10.0);
     transform.look_at(Vec3::new(0.0, 0.5, 0.0), Vec3::new(0.0, 1.0, 0.0));
 }
 
 fn start_socket(mut commands: Commands) {
-    let socket = MatchboxSocket::new_reliable("ws://localhost:3536/hello");
+    let socket = MatchboxSocket::new_reliable("wss://mb.v-sekai.cloud/hello1");
     commands.insert_resource(socket);
 }
 

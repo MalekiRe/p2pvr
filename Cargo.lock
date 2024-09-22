@@ -1444,8 +1444,7 @@ dependencies = [
 [[package]]
 name = "bevy_shader_mtoon"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19a26046674373e5d1c54c54fa28d64bb682bdf03fd3d1c72a9550836d944346"
+source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
 dependencies = [
  "bevy",
  "bevy_mod_outline",
@@ -1630,8 +1629,7 @@ dependencies = [
 [[package]]
 name = "bevy_vrm"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c00a6a71a87aac11addffc8503ac3820a25e29cc5262397e0b9183aed5b57abd"
+source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
 dependencies = [
  "bevy",
  "bevy_gltf_kun",
@@ -3061,8 +3059,7 @@ dependencies = [
 [[package]]
 name = "gltf_kun_vrm"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dfa96b122fa2d2f9eba82ec7e302c2b63a0edc1b1696f8c63986c1a6c75a8cc"
+source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
 dependencies = [
  "gltf_kun",
  "serde",
@@ -4545,6 +4542,7 @@ dependencies = [
  "unavi-avatar",
  "unavi-player",
  "uuid",
+ "web-sys",
 ]
 
 [[package]]
@@ -5498,8 +5496,7 @@ dependencies = [
 [[package]]
 name = "serde_vrm"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "066947cf117620028601b4eed6851bf56a101993eab838edaf07398f30662166"
+source = "git+https://github.com/unavi-xyz/bevy_vrm#766133ee962d4d8f18ae95144ecaa9c51b4f232e"
 dependencies = [
  "bevy",
  "serde",

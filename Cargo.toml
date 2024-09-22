@@ -11,11 +11,12 @@ bevy = "0.14.2"
 bevy_matchbox = { version = "0.10.0", features = ["signaling"] }
 unavi-player = { path = "./3rd-party-crates/unavi-player" }
 bevy_basic_portals = "0.6.0"
-bevy_vrm = "0.0.11"
+bevy_vrm = { git = "https://github.com/unavi-xyz/bevy_vrm" }
 bevy-tnua-physics-integration-layer = { path = "./3rd-party-crates/bevy-tnua2/physics-integration-layer" }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 unavi-avatar = { path = "./3rd-party-crates/unavi-avatar"}
+web-sys = "0.3.70"
 
 [dependencies.uuid]
 version = "1.10.0"
