@@ -7,31 +7,32 @@ use avian_interpolation3d::{
 use avian_pickup::prelude::{AvianPickupAction, AvianPickupActor, AvianPickupInput};
 use avian_pickup::AvianPickupPlugin;
 use bevy::app::RunFixedMainLoop;
+use bevy::asset::AssetMetaCheck;
 use bevy::ecs::query::QuerySingleError;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::mouse::MouseMotion;
 use bevy::render::camera::camera_system;
 use bevy::render::view::RenderLayers;
 use bevy::time::run_fixed_main_schedule;
+use bevy::window::WindowResolution;
 use bevy::{prelude::*, time::common_conditions::on_timer, utils::Duration};
 use bevy_basic_portals::{AsPortalDestination, CreatePortal, CreatePortalBundle, PortalsPlugin};
 use bevy_matchbox::prelude::*;
 use bevy_tnua_physics_integration_layer::data_for_backends::TnuaProximitySensor;
 use bevy_vrm::first_person::{FirstPersonFlag, RENDER_LAYERS};
+use bevy_vrm::VrmBundle;
 use serde::{Deserialize, Serialize};
 use std::f32::consts::FRAC_PI_2;
-use bevy::asset::AssetMetaCheck;
-use bevy::window::WindowResolution;
-use bevy_vrm::VrmBundle;
-use unavi_avatar::{AvatarBundle, AverageVelocity, default_character_animations, DEFAULT_VRM, FallbackAvatar};
-use unavi_player::layers::{LAYER_LOCAL_PLAYER, LAYER_OTHER_PLAYER, LAYER_PROPS};
+use unavi_avatar::{
+    default_character_animations, AvatarBundle, AverageVelocity, FallbackAvatar, DEFAULT_VRM,
+};
 use unavi_avatar::{PLAYER_HEIGHT, PLAYER_WIDTH};
+use unavi_player::layers::{LAYER_LOCAL_PLAYER, LAYER_OTHER_PLAYER, LAYER_PROPS};
 use unavi_player::{LocalPlayer, PlayerCamera, PlayerPlugin};
 use uuid::{uuid, Uuid};
 
 fn main() {
     App::new()
-
         .add_plugins((
             DefaultPlugins.set(AssetPlugin {
                 meta_check: AssetMetaCheck::Never,
@@ -47,14 +48,14 @@ fn main() {
         .add_systems(Startup, setup_scene)
         .add_systems(Update, player_add_pickup)
         .add_systems(Update, add_uuid)
-        .add_systems(FixedPreUpdate, (handle_input).before(run_fixed_main_schedule))
+        .add_systems(
+            FixedPreUpdate,
+            (handle_input).before(run_fixed_main_schedule),
+        )
         .add_systems(Startup, start_socket)
         .add_systems(Update, receive_messages)
-        .add_systems(
-            Update,
-            send_message,
-        )
-        .add_systems(Startup, |mut windows: Query<&mut Window>,| {
+        .add_systems(Update, send_message)
+        .add_systems(Startup, |mut windows: Query<&mut Window>| {
             windows.single_mut().resolution.set(1920.0, 1080.0);
         })
         .run();
@@ -127,17 +128,19 @@ fn player_add_pickup(
             InterpolateTransformFields {
                 translation: InterpolationMode::Linear,
                 rotation: InterpolationMode::Linear,
-            }
+            },
         ));
     }
 }
 
 fn add_uuid(
     mut commands: Commands,
-    local_player: Query<Entity, (With<LocalPlayer>, Without<PlayerUuid>)>
+    local_player: Query<Entity, (With<LocalPlayer>, Without<PlayerUuid>)>,
 ) {
     for e in local_player.iter() {
-        commands.entity(e).insert(PlayerUuid(Uuid::new_v4().to_string()));
+        commands
+            .entity(e)
+            .insert(PlayerUuid(Uuid::new_v4().to_string()));
     }
 }
 
@@ -248,7 +251,12 @@ fn send_message(
     let peers: Vec<_> = socket.connected_peers().collect();
 
     for peer in peers {
-        let msg = Message::Position(uuid.0.clone(), position.clone(), rotation.clone(), linear_velocity.clone());
+        let msg = Message::Position(
+            uuid.0.clone(),
+            position.clone(),
+            rotation.clone(),
+            linear_velocity.clone(),
+        );
         let msg = serde_json::to_string(&msg).unwrap();
 
         //info!("Sending message: {msg:?} to {peer}");
@@ -256,7 +264,17 @@ fn send_message(
     }
 }
 
-fn receive_messages(mut commands: Commands, mut socket: ResMut<MatchboxSocket<SingleChannel>>, mut query: Query<(&mut Position, &mut Rotation, &mut LinearVelocity, &PlayerUuid)>, asset_server: Res<AssetServer>) {
+fn receive_messages(
+    mut commands: Commands,
+    mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+    mut query: Query<(
+        &mut Position,
+        &mut Rotation,
+        &mut LinearVelocity,
+        &PlayerUuid,
+    )>,
+    asset_server: Res<AssetServer>,
+) {
     for (peer, state) in socket.update_peers() {
         //info!("{peer}: {state:?}");
     }
@@ -283,7 +301,7 @@ fn receive_messages(mut commands: Commands, mut socket: ResMut<MatchboxSocket<Si
                         }
                     }
                 }
-            },
+            }
             Err(e) => error!("Failed to convert message to string: {e}"),
         }
     }
@@ -311,7 +329,7 @@ pub fn spawn_other_player(asset_server: &AssetServer, commands: &mut Commands, u
                 global_transform: GlobalTransform::from_translation(SPAWN),
                 ..default()
             },
-            uuid
+            uuid,
         ))
         .id();
 
@@ -335,8 +353,6 @@ pub fn spawn_other_player(asset_server: &AssetServer, commands: &mut Commands, u
             },
         ))
         .id();
-
-
 
     commands.entity(body).push_children(&[avatar]);
 }
