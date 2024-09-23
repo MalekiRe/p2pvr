@@ -1,8 +1,11 @@
+use crate::custom_audio::audio_output::AudioOutput;
+use crate::custom_audio::spatial_audio::{SpatialAudioSink, SpatialAudioSinkBundle};
 use crate::networking::message::{DeleteProp, PlayerPosition, SpawnCube, UpdateProp};
 use crate::networking::systems::{
     message_handling, remove_dead_players, sync_local_player_to_network,
     sync_local_props_to_network,
 };
+use crate::voice_chat::VoiceMsg;
 use crate::SPAWN;
 use avian3d::collision::{Collider, CollisionLayers};
 use avian3d::prelude::{GravityScale, LockedAxes, RigidBody};
@@ -10,12 +13,13 @@ use bevy::app::App;
 use bevy::asset::AssetServer;
 use bevy::prelude::{
     default, BuildChildren, Commands, Component, GlobalTransform, IntoSystemConfigs, Plugin,
-    SceneBundle, SpatialBundle, Transform, Update,
+    SceneBundle, SpatialBundle, Transform, Update, Vec3,
 };
 use bevy_matchbox::matchbox_socket::{Packet, SingleChannel};
-use bevy_matchbox::prelude::PeerId;
+use bevy_matchbox::prelude::{MultipleChannels, PeerId};
 use bevy_matchbox::MatchboxSocket;
 use bevy_vrm::VrmBundle;
+use rodio::SpatialSink;
 use serde::{Deserialize, Serialize};
 use std::str::Utf8Error;
 use unavi_avatar::{
@@ -42,6 +46,7 @@ pub enum Message {
     UpdateProp(UpdateProp),
     DeleteProp(DeleteProp),
     PlayerPosition(PlayerPosition),
+    VoiceChat(VoiceMsg),
 }
 
 #[derive(Component)]
@@ -51,19 +56,28 @@ pub struct ExternalPlayer {
 }
 
 pub trait SocketSendMessage {
-    fn send_msg(&mut self, peer: PeerId, message: &Message);
-    fn receive_msg(&mut self) -> Vec<(PeerId, Message)>;
-    fn send_msg_all(&mut self, message: &Message);
+    fn send_msg_unreliable(&mut self, peer: PeerId, message: &Message);
+    fn send_msg_reliable(&mut self, peer: PeerId, message: &Message);
+    fn receive_msg_reliable(&mut self) -> Vec<(PeerId, Message)>;
+    fn receive_msg_unreliable(&mut self) -> Vec<(PeerId, Message)>;
+    fn send_msg_all_reliable(&mut self, message: &Message);
+    fn send_msg_all_unreliable(&mut self, message: &Message);
 }
 
-impl SocketSendMessage for MatchboxSocket<SingleChannel> {
-    fn send_msg(&mut self, peer: PeerId, message: &Message) {
+impl SocketSendMessage for MatchboxSocket<MultipleChannels> {
+    fn send_msg_unreliable(&mut self, peer: PeerId, message: &Message) {
         let msg = serde_json::to_string(message).unwrap();
 
-        self.send(msg.as_bytes().into(), peer);
+        self.channel_mut(1).send(msg.as_bytes().into(), peer);
     }
-    fn receive_msg(&mut self) -> Vec<(PeerId, Message)> {
-        self.receive()
+    fn send_msg_reliable(&mut self, peer: PeerId, message: &Message) {
+        let msg = serde_json::to_string(message).unwrap();
+
+        self.channel_mut(0).send(msg.as_bytes().into(), peer);
+    }
+    fn receive_msg_reliable(&mut self) -> Vec<(PeerId, Message)> {
+        self.channel_mut(0)
+            .receive()
             .into_iter()
             .map(|(id, packet)| {
                 let str = std::str::from_utf8(&packet).unwrap();
@@ -71,10 +85,26 @@ impl SocketSendMessage for MatchboxSocket<SingleChannel> {
             })
             .collect()
     }
-    fn send_msg_all(&mut self, message: &Message) {
+    fn receive_msg_unreliable(&mut self) -> Vec<(PeerId, Message)> {
+        self.channel_mut(1)
+            .receive()
+            .into_iter()
+            .map(|(id, packet)| {
+                let str = std::str::from_utf8(&packet).unwrap();
+                (id, serde_json::from_str::<Message>(str).unwrap())
+            })
+            .collect()
+    }
+    fn send_msg_all_reliable(&mut self, message: &Message) {
         let peers = self.connected_peers().collect::<Vec<_>>();
         for peer in peers {
-            self.send_msg(peer, message);
+            self.send_msg_reliable(peer, message);
+        }
+    }
+    fn send_msg_all_unreliable(&mut self, message: &Message) {
+        let peers = self.connected_peers().collect::<Vec<_>>();
+        for peer in peers {
+            self.send_msg_unreliable(peer, message);
         }
     }
 }
@@ -156,11 +186,12 @@ pub mod systems {
     use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
     use bevy::prelude::*;
     use bevy_matchbox::matchbox_socket::SingleChannel;
+    use bevy_matchbox::prelude::MultipleChannels;
     use bevy_matchbox::MatchboxSocket;
     use unavi_player::LocalPlayer;
 
     pub fn sync_local_player_to_network(
-        mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+        mut socket: ResMut<MatchboxSocket<MultipleChannels>>,
         local_player: Query<
             (&Position, &Rotation, &LinearVelocity, &PlayerUuid),
             (
@@ -194,13 +225,20 @@ pub mod systems {
             rotation: rotation.clone(),
             linear_velocity: linear_velocity.clone(),
         });
-        socket.send_msg_all(&message);
+        socket.send_msg_all_reliable(&message);
     }
 
     pub fn sync_local_props_to_network(
-        mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+        mut socket: ResMut<MatchboxSocket<MultipleChannels>>,
         local_props: Query<
-            (&Position, &Rotation, &LinearVelocity, &AngularVelocity, &PropUuid, &Authority),
+            (
+                &Position,
+                &Rotation,
+                &LinearVelocity,
+                &AngularVelocity,
+                &PropUuid,
+                &Authority,
+            ),
             (
                 With<Authority>,
                 Or<(
@@ -225,7 +263,9 @@ pub mod systems {
 
         socket.update_peers();
 
-        for (position, rotation, linear_velocity, angular_velocity, uuid, authority) in local_props.iter() {
+        for (position, rotation, linear_velocity, angular_velocity, uuid, authority) in
+            local_props.iter()
+        {
             if authority.player != *player_uuid {
                 continue;
             }
@@ -237,13 +277,13 @@ pub mod systems {
                 linear_velocity: linear_velocity.clone(),
                 angular_velocity: angular_velocity.clone(),
             });
-            socket.send_msg_all(&message);
+            socket.send_msg_all_reliable(&message);
         }
     }
 
     pub fn remove_dead_players(
         mut commands: Commands,
-        mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+        mut socket: ResMut<MatchboxSocket<MultipleChannels>>,
         external_players: Query<(Entity, &ExternalPlayer)>,
     ) {
         // TODO this is stupid and simple and will start to get slow if you have like
@@ -258,24 +298,28 @@ pub mod systems {
     }
 
     pub mod message_handling {
+        use crate::custom_audio::audio_output::AudioOutput;
         use crate::networking::message::*;
         use crate::networking::{
             spawn_external_player, Authority, ExternalPlayer, Message, PlayerUuid, PropUuid,
             SocketSendMessage,
         };
+        use crate::voice_chat::VoiceMsg;
         use avian3d::prelude::{AngularVelocity, LinearVelocity, Position, Rotation};
         use bevy::prelude::*;
+        use bevy_matchbox::matchbox_socket::MultipleChannels;
         use bevy_matchbox::prelude::SingleChannel;
         use bevy_matchbox::MatchboxSocket;
 
         pub fn route_messages(
-            mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+            mut socket: ResMut<MatchboxSocket<MultipleChannels>>,
             mut player_position: EventWriter<PlayerPosition>,
             mut spawn_cube: EventWriter<SpawnCube>,
             mut update_prop: EventWriter<UpdateProp>,
             mut delete_prop: EventWriter<DeleteProp>,
+            mut voice_chat: EventWriter<VoiceMsg>,
         ) {
-            for (_id, message) in socket.receive_msg() {
+            for (_id, message) in socket.receive_msg_reliable() {
                 match message {
                     Message::SpawnCube(sc) => {
                         spawn_cube.send(sc);
@@ -288,6 +332,28 @@ pub mod systems {
                     }
                     Message::PlayerPosition(pp) => {
                         player_position.send(pp);
+                    }
+                    Message::VoiceChat(vc) => {
+                        voice_chat.send(vc);
+                    }
+                };
+            }
+            for (_id, message) in socket.receive_msg_unreliable() {
+                match message {
+                    Message::SpawnCube(sc) => {
+                        spawn_cube.send(sc);
+                    }
+                    Message::UpdateProp(up) => {
+                        update_prop.send(up);
+                    }
+                    Message::DeleteProp(dp) => {
+                        delete_prop.send(dp);
+                    }
+                    Message::PlayerPosition(pp) => {
+                        player_position.send(pp);
+                    }
+                    Message::VoiceChat(vc) => {
+                        voice_chat.send(vc);
                     }
                 };
             }
@@ -305,8 +371,14 @@ pub mod systems {
             )>,
         ) {
             for update_prop in event_reader.read() {
-                for (mut position, mut rotation, mut linear_velocity, mut angular_velocity, prop_uuid, mut authority) in
-                    external_props.iter_mut()
+                for (
+                    mut position,
+                    mut rotation,
+                    mut linear_velocity,
+                    mut angular_velocity,
+                    prop_uuid,
+                    mut authority,
+                ) in external_props.iter_mut()
                 {
                     if update_prop.prop_uuid != *prop_uuid {
                         continue;
@@ -327,6 +399,7 @@ pub mod systems {
 
         pub fn player_position(
             mut commands: Commands,
+            mut audio_output: ResMut<AudioOutput>,
             mut event_reader: EventReader<PlayerPosition>,
             mut external_players: Query<
                 (
@@ -359,6 +432,7 @@ pub mod systems {
                 }
                 if !exists {
                     spawn_external_player(
+                        &mut audio_output,
                         &asset_server,
                         &mut commands,
                         player_position.player_uuid.clone(),
@@ -374,6 +448,7 @@ pub mod systems {
 }
 
 pub fn spawn_external_player(
+    audio_output: &mut AudioOutput,
     asset_server: &AssetServer,
     commands: &mut Commands,
     uuid: PlayerUuid,
@@ -399,6 +474,15 @@ pub fn spawn_external_player(
             },
             uuid.clone(),
             ExternalPlayer { uuid, peer_id },
+            SpatialAudioSink {
+                sink: SpatialSink::try_new(
+                    audio_output.stream_handle.as_ref().unwrap(),
+                    [0.0, 0.0, 0.0],
+                    (Vec3::X * 4.0 / -2.0).to_array(),
+                    (Vec3::X * 4.0 / 2.0).to_array(),
+                )
+                .unwrap(),
+            },
         ))
         .id();
 

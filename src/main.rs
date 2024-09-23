@@ -1,9 +1,15 @@
+mod custom_audio;
 mod networking;
+mod voice_chat;
 
+use crate::custom_audio::audio_output::AudioOutputPlugin;
+use crate::custom_audio::microphone::MicrophonePlugin;
+use crate::custom_audio::spatial_audio::{SpatialAudioListener, SpatialAudioPlugin};
 use crate::networking::message::SpawnCube;
 use crate::networking::{
     Authority, Message, NetworkingPlugin, PlayerUuid, PropUuid, SocketSendMessage,
 };
+use crate::voice_chat::VoiceChatPlugin;
 use avian3d::prelude::*;
 use avian3d::prelude::{Collider, RigidBody};
 use avian3d::PhysicsPlugins;
@@ -22,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use unavi_avatar::PLAYER_HEIGHT;
 use unavi_player::layers::LAYER_PROPS;
 use unavi_player::{LocalPlayer, PlayerCamera, PlayerPlugin};
-use uuid::{Uuid};
+use uuid::Uuid;
 
 fn main() {
     App::new()
@@ -37,7 +43,13 @@ fn main() {
             // Add interpolation
             AvianInterpolationPlugin::default(),
         ))
-        .add_plugins(NetworkingPlugin)
+        .add_plugins((
+            NetworkingPlugin,
+            AudioOutputPlugin,
+            MicrophonePlugin,
+            VoiceChatPlugin,
+            SpatialAudioPlugin,
+        ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, player_add_pickup)
         .add_systems(Update, add_uuid)
@@ -103,7 +115,7 @@ fn handle_input(
     actors: Query<Entity, With<AvianPickupActor>>,
     mut spawn_cube: EventWriter<SpawnCube>,
     local_player: Query<&PlayerUuid, With<LocalPlayer>>,
-    mut socket: ResMut<MatchboxSocket<SingleChannel>>,
+    mut socket: ResMut<MatchboxSocket<MultipleChannels>>,
 ) {
     for actor in &actors {
         if key_input.just_pressed(MouseButton::Left) {
@@ -139,7 +151,7 @@ fn handle_input(
             prop_uuid: PropUuid(Uuid::new_v4().to_string()),
             position: Position::new(Vec3::new(0.0, 2.0, 0.0)),
         };
-        socket.send_msg_all(&Message::SpawnCube(cube.clone()));
+        socket.send_msg_all_reliable(&Message::SpawnCube(cube.clone()));
         spawn_cube.send(cube.clone());
     }
 }
@@ -174,7 +186,8 @@ fn add_uuid(
     for e in local_player.iter() {
         commands
             .entity(e)
-            .insert(PlayerUuid(Uuid::new_v4().to_string()));
+            .insert(PlayerUuid(Uuid::new_v4().to_string()))
+            .insert(SpatialAudioListener);
     }
 }
 
@@ -292,9 +305,14 @@ fn setup_scene(
 }
 
 fn start_socket(mut commands: Commands) {
-    let socket = MatchboxSocket::new_reliable("wss://mb.v-sekai.cloud/hello2");
+    let matchbox = MatchboxSocket::from(
+        WebRtcSocketBuilder::new("wss://mb.v-sekai.cloud/hello3")
+            .add_reliable_channel()
+            .add_unreliable_channel()
+            .build(),
+    );
     //let socket = MatchboxSocket::new_reliable("ws://localhost:3536/hello");
-    commands.insert_resource(socket);
+    commands.insert_resource(matchbox);
 }
 
 pub const SPAWN: Vec3 = Vec3::new(0.0, PLAYER_HEIGHT * 2.0, 0.0);
