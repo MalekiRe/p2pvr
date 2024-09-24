@@ -156,7 +156,7 @@ fn handle_input(
     }
 }
 
-const GROUND_SIZE: f32 = 15.0;
+const GROUND_SIZE: f32 = 30.0;
 const GROUND_THICK: f32 = 0.2;
 const MIRROR_H: f32 = 3.0;
 
@@ -260,7 +260,12 @@ fn setup_scene(
     mut commands: Commands,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    asset_server: Res<AssetServer>,
 ) {
+
+    let floor_texture = asset_server.load("grass.ktx2");
+    let floor_normal_texture = asset_server.load("grass_normal.ktx2");
+
     ambient.brightness = 100.0;
     ambient.color = Color::linear_rgb(0.95, 0.95, 1.0);
 
@@ -285,20 +290,41 @@ fn setup_scene(
         Collider::from(box_shape),
         CollisionLayers::new(LAYER_PROPS, LayerMask::ALL),
     ));
-    commands.spawn((
-        PbrBundle {
-            mesh: meshes.add(Mesh::from(Cuboid::new(
-                GROUND_SIZE,
-                GROUND_THICK,
-                GROUND_SIZE,
-            ))),
-            material: materials.add(StandardMaterial::default()),
-            transform: Transform::from_xyz(0.0, -1.0 - GROUND_THICK / 2.0, 0.0),
-            ..default()
-        },
-        RigidBody::Static,
-        Collider::cuboid(GROUND_SIZE, GROUND_THICK, GROUND_SIZE),
-    ));
+    const FLOOR_TILING: i32 = 20;
+
+    for x in -FLOOR_TILING..FLOOR_TILING {
+        for y in -FLOOR_TILING..FLOOR_TILING {
+            commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Mesh::from(Cuboid::new(
+                        GROUND_SIZE / FLOOR_TILING as f32,
+                        GROUND_THICK,
+                        GROUND_SIZE / FLOOR_TILING as f32,
+                    ))),
+                    material: materials.add(StandardMaterial {
+                        base_color_texture: Some(floor_texture.clone()),
+                        normal_map_texture: Some(floor_normal_texture.clone()),
+                        emissive_exposure_weight: 0.0,
+                        perceptual_roughness: 1.0,
+                        reflectance: 0.2,
+                        specular_transmission: 0.0,
+                        diffuse_transmission: 0.0,
+                        thickness: 0.0,
+                        ior: 1.0,
+                        clearcoat: 0.0,
+                        anisotropy_strength: 0.0,
+                        lightmap_exposure: 1.0,
+                        //parallax_depth_scale: 0.3,
+                        ..default()
+                    }),
+                    transform: Transform::from_xyz((GROUND_SIZE / FLOOR_TILING as f32) * x as f32, -1.0 - GROUND_THICK / 2.0, (GROUND_SIZE / FLOOR_TILING as f32) * y as f32),
+                    ..default()
+                },
+                RigidBody::Static,
+                Collider::cuboid(GROUND_SIZE / FLOOR_TILING as f32, GROUND_THICK, GROUND_SIZE / FLOOR_TILING as f32),
+            ));
+        }
+    }
 
     let mut transform = Transform::from_xyz(0.0, 3.0, -10.0);
     transform.look_at(Vec3::new(0.0, 0.5, 0.0), Vec3::new(0.0, 1.0, 0.0));
@@ -311,7 +337,6 @@ fn start_socket(mut commands: Commands) {
             .add_unreliable_channel()
             .build(),
     );
-    //let socket = MatchboxSocket::new_reliable("ws://localhost:3536/hello");
     commands.insert_resource(matchbox);
 }
 

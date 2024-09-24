@@ -7,7 +7,7 @@ edition = "2021"
 avian3d = { path = "./3rd-party-crates/avian/crates/avian3d", features = ["serialize"]}
 avian_interpolation3d = { path = "./3rd-party-crates/avian_interpolation/crates/avian_interpolation3d"}
 avian_pickup = { path = "./3rd-party-crates/avian_pickup" }
-bevy = "0.14.2"
+bevy = { version = "0.14.2", features = ["ktx2" ] }
 bevy_matchbox = { version = "0.10.0", features = ["signaling"] }
 unavi-player = { path = "./3rd-party-crates/unavi-player" }
 bevy_basic_portals = "0.6.0"
