@@ -1,10 +1,12 @@
 mod custom_audio;
+mod file_sharing;
 mod networking;
 mod voice_chat;
 
 use crate::custom_audio::audio_output::AudioOutputPlugin;
 use crate::custom_audio::microphone::MicrophonePlugin;
 use crate::custom_audio::spatial_audio::{SpatialAudioListener, SpatialAudioPlugin};
+use crate::file_sharing::FileSharingPlugin;
 use crate::networking::message::SpawnCube;
 use crate::networking::{
     Authority, Message, NetworkingPlugin, PlayerUuid, PropUuid, SocketSendMessage,
@@ -22,6 +24,7 @@ use avian_pickup::AvianPickupPlugin;
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use bevy::time::run_fixed_main_schedule;
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_matchbox::prelude::*;
 use bevy_tnua_physics_integration_layer::data_for_backends::TnuaProximitySensor;
 use serde::{Deserialize, Serialize};
@@ -33,6 +36,8 @@ use uuid::Uuid;
 fn main() {
     App::new()
         .add_plugins((
+            EmbeddedAssetPlugin::default(),
+            bevy_web_file_drop::WebFileDropPlugin,
             DefaultPlugins.set(AssetPlugin {
                 meta_check: AssetMetaCheck::Never,
                 ..AssetPlugin::default()
@@ -49,6 +54,7 @@ fn main() {
             MicrophonePlugin,
             VoiceChatPlugin,
             SpatialAudioPlugin,
+            FileSharingPlugin,
         ))
         .add_systems(Startup, setup_scene)
         .add_systems(Update, player_add_pickup)
@@ -60,9 +66,6 @@ fn main() {
         )
         .add_systems(Update, update_prop_authority)
         .add_systems(Startup, start_socket)
-        .add_systems(Startup, |mut windows: Query<&mut Window>| {
-            //windows.single_mut().resolution.set(1920.0, 1080.0);
-        })
         .run();
 }
 
@@ -262,7 +265,6 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     asset_server: Res<AssetServer>,
 ) {
-
     let floor_texture = asset_server.load("grass.ktx2");
     let floor_normal_texture = asset_server.load("grass_normal.ktx2");
 
@@ -317,11 +319,19 @@ fn setup_scene(
                         //parallax_depth_scale: 0.3,
                         ..default()
                     }),
-                    transform: Transform::from_xyz((GROUND_SIZE / FLOOR_TILING as f32) * x as f32, -1.0 - GROUND_THICK / 2.0, (GROUND_SIZE / FLOOR_TILING as f32) * y as f32),
+                    transform: Transform::from_xyz(
+                        (GROUND_SIZE / FLOOR_TILING as f32) * x as f32,
+                        -1.0 - GROUND_THICK / 2.0,
+                        (GROUND_SIZE / FLOOR_TILING as f32) * y as f32,
+                    ),
                     ..default()
                 },
                 RigidBody::Static,
-                Collider::cuboid(GROUND_SIZE / FLOOR_TILING as f32, GROUND_THICK, GROUND_SIZE / FLOOR_TILING as f32),
+                Collider::cuboid(
+                    GROUND_SIZE / FLOOR_TILING as f32,
+                    GROUND_THICK,
+                    GROUND_SIZE / FLOOR_TILING as f32,
+                ),
             ));
         }
     }
@@ -332,7 +342,7 @@ fn setup_scene(
 
 fn start_socket(mut commands: Commands) {
     let matchbox = MatchboxSocket::from(
-        WebRtcSocketBuilder::new("wss://mb.v-sekai.cloud/hello3")
+        WebRtcSocketBuilder::new("wss://mb.v-sekai.cloud/hello5")
             .add_reliable_channel()
             .add_unreliable_channel()
             .build(),

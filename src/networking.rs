@@ -1,5 +1,6 @@
 use crate::custom_audio::audio_output::AudioOutput;
 use crate::custom_audio::spatial_audio::{SpatialAudioSink, SpatialAudioSinkBundle};
+use crate::file_sharing::{AvatarPart, AvatarPartEnum, LoadingBar};
 use crate::networking::message::{DeleteProp, PlayerPosition, SpawnCube, UpdateProp};
 use crate::networking::systems::{
     message_handling, remove_dead_players, sync_local_player_to_network,
@@ -22,6 +23,8 @@ use bevy_vrm::VrmBundle;
 use rodio::SpatialSink;
 use serde::{Deserialize, Serialize};
 use std::str::Utf8Error;
+use bevy_health_bar3d::prelude::BarSettings;
+use futures::channel::mpsc::SendError;
 use unavi_avatar::{
     default_character_animations, AvatarBundle, AverageVelocity, FallbackAvatar, DEFAULT_VRM,
     PLAYER_HEIGHT, PLAYER_WIDTH,
@@ -47,6 +50,7 @@ pub enum Message {
     DeleteProp(DeleteProp),
     PlayerPosition(PlayerPosition),
     VoiceChat(VoiceMsg),
+    AvatarPart(AvatarPartEnum),
 }
 
 #[derive(Component)]
@@ -62,6 +66,8 @@ pub trait SocketSendMessage {
     fn receive_msg_unreliable(&mut self) -> Vec<(PeerId, Message)>;
     fn send_msg_all_reliable(&mut self, message: &Message);
     fn send_msg_all_unreliable(&mut self, message: &Message);
+    fn try_send_msg_all_reliable(&mut self, message: &Message) -> Result<(), SendError>;
+    fn try_send_msg_reliable(&mut self, peer: PeerId, message: &Message) -> Result<(), SendError>;
 }
 
 impl SocketSendMessage for MatchboxSocket<MultipleChannels> {
@@ -106,6 +112,21 @@ impl SocketSendMessage for MatchboxSocket<MultipleChannels> {
         for peer in peers {
             self.send_msg_unreliable(peer, message);
         }
+    }
+
+    fn try_send_msg_all_reliable(&mut self, message: &Message) -> Result<(), SendError> {
+        let peers = self.connected_peers().collect::<Vec<_>>();
+        for peer in peers {
+            self.try_send_msg_reliable(peer, message)?;
+        }
+        Ok(())
+    }
+
+    fn try_send_msg_reliable(&mut self, peer: PeerId, message: &Message) -> Result<(), SendError> {
+        let msg = serde_json::to_string(message).unwrap();
+
+        self.channel_mut(0).try_send(msg.as_bytes().into(), peer)?;
+        Ok(())
     }
 }
 
@@ -299,6 +320,7 @@ pub mod systems {
 
     pub mod message_handling {
         use crate::custom_audio::audio_output::AudioOutput;
+        use crate::file_sharing::{AvatarPart, AvatarPartEnum};
         use crate::networking::message::*;
         use crate::networking::{
             spawn_external_player, Authority, ExternalPlayer, Message, PlayerUuid, PropUuid,
@@ -318,6 +340,7 @@ pub mod systems {
             mut update_prop: EventWriter<UpdateProp>,
             mut delete_prop: EventWriter<DeleteProp>,
             mut voice_chat: EventWriter<VoiceMsg>,
+            mut avatar_parts: EventWriter<AvatarPartEnum>,
         ) {
             for (_id, message) in socket.receive_msg_reliable() {
                 match message {
@@ -335,6 +358,9 @@ pub mod systems {
                     }
                     Message::VoiceChat(vc) => {
                         voice_chat.send(vc);
+                    }
+                    Message::AvatarPart(ap) => {
+                        avatar_parts.send(ap);
                     }
                 };
             }
@@ -354,6 +380,9 @@ pub mod systems {
                     }
                     Message::VoiceChat(vc) => {
                         voice_chat.send(vc);
+                    }
+                    Message::AvatarPart(_) => {
+                        panic!()
                     }
                 };
             }
@@ -482,6 +511,15 @@ pub fn spawn_external_player(
                     (Vec3::X * 4.0 / 2.0).to_array(),
                 )
                 .unwrap(),
+            },
+            LoadingBar {
+                len: 1,
+                current: 1,
+            },
+            BarSettings::<LoadingBar> {
+                width: 1.,
+                offset: 0.8,
+                ..default()
             },
         ))
         .id();

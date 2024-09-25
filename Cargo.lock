@@ -929,6 +929,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_blob_loader"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61a8daa1c266ee726272ddb1efa10b80a33d8b15aa1f87f7d2546fdaa2b15b13"
+dependencies = [
+ "base64 0.22.1",
+ "bevy",
+ "js-sys",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "bevy_color"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1044,6 +1058,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_embedded_assets"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3f3e7b41a9b01b767ba07c4ebb083b2d8d8055e57ddef7e55e502bbfc961505"
+dependencies = [
+ "bevy",
+ "cargo-emit",
+ "futures-io",
+ "futures-lite",
+ "thiserror",
+]
+
+[[package]]
 name = "bevy_encase_derive"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1145,6 +1172,16 @@ dependencies = [
  "image",
  "serde_json",
  "thiserror",
+]
+
+[[package]]
+name = "bevy_health_bar3d"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9e8f511a17f8ac3cdf1c86d438a09f6a53d4c195cd03f6736377b1eadbe510c"
+dependencies = [
+ "bevy",
+ "ordered-float",
 ]
 
 [[package]]
@@ -1646,6 +1683,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_web_file_drop"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "002f9aea07e770637e2d91b99eda46a39a3603deff5184ac3cf1749ba01a70c0"
+dependencies = [
+ "bevy",
+ "bevy_blob_loader",
+ "js-sys",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "bevy_window"
 version = "0.14.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1888,6 +1937,12 @@ dependencies = [
  "slab",
  "thiserror",
 ]
+
+[[package]]
+name = "cargo-emit"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1582e1c9e755dd6ad6b224dcffb135d199399a4568d454bd89fe515ca8425695"
 
 [[package]]
 name = "cbc"
@@ -4714,6 +4769,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "3.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1e1c390732d15f1d48471625cd92d154e66db2c56645e29a9cd26f4699f72dc"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4750,9 +4814,14 @@ dependencies = [
  "bevy",
  "bevy-tnua-physics-integration-layer",
  "bevy_basic_portals",
+ "bevy_blob_loader",
+ "bevy_embedded_assets",
+ "bevy_health_bar3d",
  "bevy_matchbox",
  "bevy_vrm",
+ "bevy_web_file_drop",
  "cpal",
+ "futures",
  "gloo",
  "opus",
  "rodio 0.19.0",
@@ -4762,6 +4831,7 @@ dependencies = [
  "unavi-player",
  "uuid",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 

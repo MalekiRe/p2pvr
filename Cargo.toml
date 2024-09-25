@@ -23,8 +23,12 @@ cpal = { version = "0.15.3", features = ["wasm-bindgen"] }
 wasm-bindgen = "0.2.93"
 # `gloo` is a utility crate which improves ergonomics over direct `web-sys` usage.
 gloo = "0.11.0"
-
-
+bevy_web_file_drop = "0.0.6"
+bevy_blob_loader = "0.0.6"
+bevy_embedded_assets = "0.11.0"
+wasm-bindgen-futures = "0.4.43"
+futures = "0.3.30"
+bevy_health_bar3d = "3.3.0"
 
 [dependencies.uuid]
 version = "1.10.0"

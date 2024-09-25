@@ -125,20 +125,24 @@ pub fn create_microphone(mut commands: Commands) {
     };
     let configs = match device.supported_input_configs() {
         Ok(configs) => configs,
-        Err(err) => return warn!(
+        Err(err) => {
+            return warn!(
             "supported stream config error, microphone functionality will be disabled, error: {}",
             err
-        ),
+        )
+        }
     };
     for config in configs {
         debug!("supported microphone config: {:#?}", config);
     }
     let mut configs = match device.supported_input_configs() {
         Ok(configs) => configs,
-        Err(err) => return warn!(
+        Err(err) => {
+            return warn!(
             "supported stream config error, microphone functionality will be disabled, error: {}",
             err
-        ),
+        )
+        }
     };
 
     #[cfg(target_os = "android")]
@@ -152,10 +156,12 @@ pub fn create_microphone(mut commands: Commands) {
             && c.min_sample_rate().0 <= microphone_config.sample_rate
             && c.max_sample_rate().0 >= microphone_config.sample_rate
     }) {
-        None => return warn!(
+        None => {
+            return warn!(
             "microphone config of {:?} not supported, microphone functionality will be disabled",
             microphone_config
-        ),
+        )
+        }
         Some(config) => config,
     }
     .with_sample_rate(cpal::SampleRate(microphone_config.sample_rate));

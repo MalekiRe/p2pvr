@@ -11,3 +11,4 @@ public_url = "./"
 no_spa = true
 # Open a browser tab once the initial build is complete.
 open = true
+no_autoreload = true
